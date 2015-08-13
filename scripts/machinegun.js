@@ -1,18 +1,18 @@
-function Gun(name, size, scene) {
+function Machinegun(name, size, scene) {
     this.name = name;
     this.size = size;
     this.scene = scene;
     this.active = false;
     // Variables for moving the gun
     this.gunMovementX = 0;
-    this.maxGunMovementX = 1000;
+    this.maxMachinegunMovementX = 1000;
     this.gunMovementY = 0;
-    this.maxGunMovementY = 200;
+    this.maxMachinegunMovementY = 200;
 
     // variables for animating
     this.index = 0;
     this.animation_direction = 1; //1 = up, -1 = down
-    this.animation_speed = 100;
+    this.animation_speed = 150;
     this.shooting = false;
 
     this.impactSpriteManager = new BABYLON.SpriteManager("impactManager", "img/impact.png", 2000, 800, this.scene);
@@ -20,48 +20,38 @@ function Gun(name, size, scene) {
     var _this = this;
 }
 
-inheritsFrom(Gun, Weapon);
+inheritsFrom(Machinegun, Weapon);
 
-Gun.prototype.updateFrame = function(){
+Machinegun.prototype.shootFrame = function(index){
     if (!this.active) {
-        this.shooting = false;
         return;
     }
-    this.index += this.animation_direction;
-    if (this.index == this.size - 1){
-        this.animation_direction = -1;
-        this.index -= 1;
-    }
-    if (this.index == 0 && this.animation_direction == -1){
-        // stop this animation
-        this.shooting = false;
-        this.animation_direction = 1;
-    }
+    this.index = index;
     var name  = "img/weapons/" + this.name + "_" + this.index+ ".png";
     $('#weapon').attr("src", name);
     var _this = this;
-    if (this.shooting){
-        setTimeout(function(){_this.updateFrame()}, this.animation_speed);
+    if (index == 1) {
+        setTimeout(function(){_this.shootFrame(0)}, this.animation_speed);
     }
 }
 
-Gun.prototype.registerGunMovement = function(){
+Machinegun.prototype.registerGunMovement = function(){
     var _this = this;
-    //TODO - too lazy to convert the moveGun method to use jquery events
+    //TODO - too lazy to convert the moveMachinegun method to use jquery events
     document.getElementById('canvas').addEventListener('mousemove', function(evt){
         if (_this.active) { 
-            _this.moveGun(evt);
+            _this.moveMachinegun(evt);
         }
     });
 }
 
-Gun.prototype.moveGun = function(e) {
+Machinegun.prototype.moveMachinegun = function(e) {
     this.gunMovementX += e.movementX;
     this.gunMovementY += e.movementY;
-    if (this.gunMovementX <  -1 * this.maxGunMovementX) this.gunMovementX = -1 * this.maxGunMovementX;
-    if (this.gunMovementX > this.maxGunMovementX) this.gunMovementX = this.maxGunMovementX;
-    if (this.gunMovementY <  -1 * this.maxGunMovementY) this.gunMovementY = -1 * this.maxGunMovementY;
-    if (this.gunMovementY > this.maxGunMovementY) this.gunMovementY = this.maxGunMovementY;
+    if (this.gunMovementX <  -1 * this.maxMachinegunMovementX) this.gunMovementX = -1 * this.maxMachinegunMovementX;
+    if (this.gunMovementX > this.maxMachinegunMovementX) this.gunMovementX = this.maxMachinegunMovementX;
+    if (this.gunMovementY <  -1 * this.maxMachinegunMovementY) this.gunMovementY = -1 * this.maxMachinegunMovementY;
+    if (this.gunMovementY > this.maxMachinegunMovementY) this.gunMovementY = this.maxMachinegunMovementY;
 
     var mouseX = this.gunMovementX;
     var mouseY = this.gunMovementY;
@@ -77,36 +67,47 @@ Gun.prototype.moveGun = function(e) {
     var startY = 100;
     var posX = startX - (shiftX/10);
     var posY = startY + (shiftY/10);
+    posX += 125;
+    posX = posX / 20;
+    var left = 20 + Math.max(-8, Math.min(8, posX));
 
-    $('#weapon').css({ 'left': posX + 'px', 'bottom': posY + 'px' });
+    $('#weapon').css({ 'left': left + '%', 'bottom': posY + 'px' });
 };
-
-function showBlood(scene,  source, dest, playerid) {
-    if (!dest || !dest.x) {
-	return;
-    }
-    // new BloodSpatter(scene, null, dest);
-    playSound('pistol', source);
-    playSound('pain', dest);
-}
 
 function showSparks(scene, source, dest, playerid) {
-    // new Sparks(scene, dest);
+    new Sparks(scene, dest);
     playSound('pistol', source);
-    setTimeout(function() { playSound('ricochet', dest); }, 100);
 };
 
-Gun.prototype.fire = function() {
-    if (!this.shooting) {
+Machinegun.prototype.fire = function() {
+    if (!this.shooting) { 
         this.shooting = true;
-        this.updateFrame();
+        var _this = this;
+        this.firebullet();
+        this.shoot_int = setInterval(function() {
+            _this.firebullet();
+        }, 200);
+    }
+}
+
+Machinegun.prototype.stop_fire = function() {
+    clearInterval(this.shoot_int);
+    this.shooting = false;
+}
+
+Machinegun.prototype.firebullet = function() {
 	// send the hit event to server to reduce player's health
+    if (!this.active) {
+        this.stop_fire;
+        return;
+    }
+    this.shootFrame(1);
 	var pickResult = this.getPick();
 	if (pickResult.pickedMesh && pickResult.pickedMesh.playerId) {
 	    new BloodSpatter(this.scene, pickResult.pickedMesh);
 	    socket.emit('hit', {
 		id: pickResult.pickedMesh.playerId,
-		weapon: 'pistol',
+		weapon: 'mg',
 		source: localPlayer.camera.position,
 		dest: pickResult.pickedMesh.position
 	    });
@@ -115,7 +116,7 @@ Gun.prototype.fire = function() {
 	    new Sparks(this.scene, pickResult.pickedPoint);
 	    var event = {
 		id: pickResult.pickedMesh.playerId,
-		weapon: 'pistol',
+		weapon: 'mg',
 		source: localPlayer.camera.position,
 		dest: pickResult.pickedPoint,
 	    };	    
@@ -123,5 +124,10 @@ Gun.prototype.fire = function() {
 	    socket.emit('pistolshot', event);
 	}
     addRecoil();
-    }
 };
+
+function addRecoil() {
+    var cam = scene.cameras[0];
+    cam.rotation.y += (Math.random()*.03) - .015;
+    cam.rotation.x -= Math.random()*.03;
+}

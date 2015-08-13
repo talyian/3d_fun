@@ -1,1 +1,9 @@
 Playing around with babylonjs
+
+To start:
+```
+cd server && npm install && node server.js
+```
+
+Navigate to localhost:8001
+
